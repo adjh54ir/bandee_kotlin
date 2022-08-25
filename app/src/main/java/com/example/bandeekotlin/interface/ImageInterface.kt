@@ -1,0 +1,24 @@
+package com.example.bandeekotlin.interface
+
+//RetorifitService.kt
+interface RetrofitService {
+
+    //GET 예제
+    @GET("posts/1")
+    fun getUser(): Call<User>
+
+    @GET("posts/{page}")
+    fun getUserPage(@Path("page") page: String): Call<User>
+
+
+//    @GET("posts/1")
+//    fun getStudent(@Query("school_id") schoolId: Int,
+//                   @Query("grade") grade: Int,
+//                   @Query("classroom") classroom: Int): Call<ExampleResponse>
+//
+//
+//    //POST 예제
+//    @FormUrlEncoded
+//    @POST("posts")
+//    fun getContactsObject(@Field("idx") idx: String): Call<JsonObject>
+}
