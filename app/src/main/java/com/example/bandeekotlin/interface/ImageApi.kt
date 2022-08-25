@@ -1,10 +1,12 @@
 package com.example.bandeekotlin.`interface`
 
+import com.example.bandeekotlin.model.PostImage
 import com.example.bandeekotlin.model.ResponseCode
 import com.example.bandeekotlin.model.ResultImage
 import org.json.JSONObject
 import retrofit2.Call
 import retrofit2.http.*
+
 
 interface ImageApi {
 
@@ -18,9 +20,7 @@ interface ImageApi {
     ): Call<ResponseCode>
 
     @POST("/getBase64")
-    fun postBase64(
-        @Query("imageBase64") imageBase64: String,
-    ): Call<JSONObject>
+    open fun postBase64(@Body post: PostImage): Call<ResponseCode>
 
 
     @GET("/getFlask")
