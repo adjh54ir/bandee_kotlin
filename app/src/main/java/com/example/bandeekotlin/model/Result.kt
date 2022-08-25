@@ -1,4 +1,4 @@
-package com.example.bandee.model
+package com.example.bandeekotlin.model
 
 /**
  * 결과값 반환

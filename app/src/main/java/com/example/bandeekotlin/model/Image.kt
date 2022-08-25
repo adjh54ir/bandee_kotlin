@@ -1,4 +1,4 @@
-package com.example.bandee.model
+package com.example.bandeekotlin.model
 
 import com.google.gson.annotations.SerializedName
 

@@ -1,6 +1,7 @@
 package com.example.bandeekotlin.`interface`
 
-import com.example.bandee.model.ResultImage
+import com.example.bandeekotlin.model.ResponseCode
+import com.example.bandeekotlin.model.ResultImage
 import org.json.JSONObject
 import retrofit2.Call
 import retrofit2.http.*
@@ -13,6 +14,11 @@ interface ImageApi {
     // GET 방식을 통해서 base64를 전송한다.
     @GET("/getBase64")
     fun getBase64(
+        @Query("imageBase64") imageBase64: String,
+    ): Call<ResponseCode>
+
+    @POST("/getBase64")
+    fun postBase64(
         @Query("imageBase64") imageBase64: String,
     ): Call<JSONObject>
 
