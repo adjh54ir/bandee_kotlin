@@ -79,8 +79,6 @@ class MainActivity : AppCompatActivity() {
      * GET 방식을 통한 데이터 전달 방식
      */
     private fun getBase64(service: ImageApi) {
-
-
         service.getBase64(imageBase64 = "asdsd")
             .enqueue(object : retrofit2.Callback<ResponseCode> {
                 // 응답을 받는 경우
