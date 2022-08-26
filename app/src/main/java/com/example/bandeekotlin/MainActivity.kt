@@ -13,6 +13,7 @@ import com.example.bandeekotlin.`interface`.ImageApi
 import com.example.bandeekotlin.model.PostImage
 import com.example.bandeekotlin.model.ResponseCode
 import okhttp3.OkHttpClient
+import org.json.JSONObject
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -43,11 +44,12 @@ class MainActivity : AppCompatActivity() {
             .baseUrl(API_BASE_URL)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
-
-        println("-- createRetrofitApi Loading !! -- ")
         val service = imageService.create(ImageApi::class.java)
-        postBase64(service);
-//        getBase64(service);
+        // 1번 수행
+        for (i in 1..10) {
+            Log.d("시간 시간 ::", "${System.currentTimeMillis()}");
+            postBase64(service);
+        }
     }
 
 
@@ -57,7 +59,8 @@ class MainActivity : AppCompatActivity() {
     private fun imageToBase64(): String {
 
         // 1. 실제 이미지 파일
-        val image1 = R.drawable.image_2
+        val image1 = R.drawable.image_3
+        val imageName = "image_2"
 
         // 2. 실제 이미지 파일 -> Bitmap
         val drawable = getDrawable(image1)
@@ -72,6 +75,7 @@ class MainActivity : AppCompatActivity() {
         val base64Str = Base64.encodeToString(byteArray, Base64.DEFAULT);
         Log.d("base64 ::::::::: ", base64Str)
 
+
         return base64Str
     }
 
@@ -81,8 +85,12 @@ class MainActivity : AppCompatActivity() {
      */
     private fun postBase64(service: ImageApi) {
         val base64Str = imageToBase64();
+
+        val tempImageName = "image1";
+
+
         // Image To base64
-        val formData = PostImage(base64Str)
+        val formData = PostImage(base64Str, tempImageName)
         service.postBase64(formData)
             .enqueue(object : retrofit2.Callback<ResponseCode> {
                 override fun onResponse(
@@ -91,6 +99,8 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     val result = response.body().toString();
                     Log.d("API RESPONSE", result)
+
+                    Log.d("종료 시간 ::", "${System.currentTimeMillis()}");
                 }
 
                 override fun onFailure(call: retrofit2.Call<ResponseCode>, t: Throwable) {
