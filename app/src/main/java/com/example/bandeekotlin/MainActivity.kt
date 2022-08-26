@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.os.Bundle
+import android.os.Debug
 import android.util.Base64
 import android.util.Base64.*
 import android.util.Log
@@ -19,6 +20,8 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.io.*
 import java.util.*
+import kotlin.time.ExperimentalTime
+import kotlin.time.measureTimedValue
 
 
 class MainActivity : AppCompatActivity() {
@@ -32,12 +35,12 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         createRetrofitApi(); // Retrofit2
-//        okHttpClinentApi(); //  okHTTP
     }
 
     /**
      * Retrofit을 이용한 API 통신 테스트
      */
+    @OptIn(ExperimentalTime::class)
     private fun createRetrofitApi() {
         val imageService = Retrofit
             .Builder()
@@ -45,22 +48,30 @@ class MainActivity : AppCompatActivity() {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
         val service = imageService.create(ImageApi::class.java)
-        // 1번 수행
-        for (i in 1..10) {
-            Log.d("시간 시간 ::", "${System.currentTimeMillis()}");
-            postBase64(service);
+
+        val mt = measureTimedValue {
+            // 1초에 2번씩 수행
+            for (i in 1..120) {
+                Log.d("시간 시간 ::", "${System.currentTimeMillis()}");
+                postBase64(service);
+            }
         }
+        Log.d("측정 시간!!!!", "${mt}");
+
     }
 
 
     /**
      * image to Base64
+     * STEP1: 내 디렉토리 내에서 실제 이미지 파일을 받는다
+     * STEP2: 이미지 파일을 Bitmap 형태로 변경한다
+     * STEP3: Bitmap -> ByteArr로 변경
+     * STEP4: ByteArr -> String으로 변경
      */
     private fun imageToBase64(): String {
 
         // 1. 실제 이미지 파일
         val image1 = R.drawable.image_3
-        val imageName = "image_2"
 
         // 2. 실제 이미지 파일 -> Bitmap
         val drawable = getDrawable(image1)
@@ -160,7 +171,5 @@ class MainActivity : AppCompatActivity() {
                 Log.d("안녕하세요 제발 수행되면 저에게 이야기좀 해주세요", "결과는 ${result}")
             }
         })
-
     }
-
 }
