@@ -7,32 +7,40 @@ import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Bundle
-import android.util.Base64
 import android.util.Base64.*
 import android.util.Log
+import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.bandeekotlin.`interface`.ImageApi
 import com.example.bandeekotlin.model.PostImage
 import com.example.bandeekotlin.model.ResponseCode
 import okhttp3.OkHttpClient
+import okhttp3.Request
+import retrofit2.Call
+import retrofit2.Callback
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.io.*
 import java.nio.ByteBuffer
+import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.time.ExperimentalTime
 import kotlin.time.measureTimedValue
 
+private const val TAG = "CameraXBasic"
 
 class MainActivity : AppCompatActivity() {
+
+
     // 시스템 환경설정 - 네트워크에 나와있는 IP주소에 따라서 지정을 한다.
     private val API_BASE_URL = "http://192.168.0.4:5000"  // 로컬 디바이스
 
@@ -51,8 +59,8 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-//        createRetrofitApi(); // Retrofit2
-        connectionCamera();
+        connectionCamera(); // 카메라 연결
+        //createRetrofitApi(); // Retrofit2 연결
     }
 
     /**
@@ -67,8 +75,9 @@ class MainActivity : AppCompatActivity() {
             // 권한 요청
             ActivityCompat.requestPermissions(this, REQUIRED_PERMISSION, REQUEST_CODE_PERMISSIONS)
         }
-//        // 캡처 버튼
-//        camera_capture_button.setOnClickListener { takePhoto() }
+        // 캡처 버튼
+        val myButton: Button = findViewById(R.id.camera_capture_button)
+        myButton.setOnClickListener { takePhoto() }
 
         // 저장할 디렉토리
         outputDirectory = getOutputDirectory()
@@ -101,6 +110,97 @@ class MainActivity : AppCompatActivity() {
      * 카메라 시작
      */
     private fun startCamera() {
+
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+
+        cameraProviderFuture.addListener(Runnable { // 카메라의 수명 주기를 LifecycleOwner응용 프로그램 프로세스 내에서 바인딩하는 데 사용됩니다 .
+
+            // 카메라의 수명 주기를 수명 주기 소유자에게 바인딩하는 데 사용됩니다.
+            val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
+
+            val preview = Preview.Builder()
+                .build()
+                .also {
+                    // Preview객체를 초기화하고 빌드를 호출하고 뷰파인더에서 표면 공급자를 가져온 다음 미리보기에서 설정합니다.
+                    val viewFinder: PreviewView = findViewById(R.id.viewFinder)
+                    it.setSurfaceProvider(viewFinder.surfaceProvider)
+                }
+
+            imageCapture = ImageCapture.Builder()
+                .build()
+
+            // 평균 이미지 광도
+            var imageLuminosityAnalyzer = ImageAnalysis.Builder()
+                .build()
+                .also {
+                    it.setAnalyzer(cameraExcutor, LuminosityAnalyzer { luma ->
+                        Log.d(TAG, "평균 광도 : $luma")
+                    })
+                }
+
+            // 기본 뒤쪽 카메라 선택
+            val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
+
+            try {
+                // 사용한 binding 모두 해제
+                cameraProvider.unbindAll()
+
+                // bind 카메라
+                cameraProvider.bindToLifecycle(
+                    this,
+                    cameraSelector,
+                    preview,
+                    imageCapture,
+                    imageLuminosityAnalyzer
+                )
+
+            } catch (exc: Exception) {
+                // 앱이 더 이상 포커스에 있지 않은 경우와 같이 이 코드가 실패할 수 있음
+                Log.e(TAG, "bind 에러", exc)
+            }
+
+        }, ContextCompat.getMainExecutor(this)) // 메인 스레드 실행
+    }
+
+    /**
+     * 사진 찍기
+     */
+    private fun takePhoto() {
+
+        // null인 경우 함수를 종료합니다.
+        // 이미지 캡처가 설정되기 전에 사진 버튼을 탭하면 null이 됩니다.
+        // return문이 없으면 앱이 충돌합니다
+        val imageCapture = imageCapture ?: return
+
+        // 이미지를 저장할 타임 스탬프 출력 파일 생성
+        val photoFile = File(
+            outputDirectory,
+            SimpleDateFormat(FILENAME_FORMAT, Locale.KOREAN)
+                .format(System.currentTimeMillis()) + "jpg"
+        )
+
+        // 파일 + 메타데이터를 포함하는 출력 옵션 객체 생성
+        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+
+        imageCapture.takePicture(
+            outputOptions,
+            ContextCompat.getMainExecutor(this),
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                    // 촬영에 성공하고, 저장됨을 사용자에게 알리기
+                    val savedUri = Uri.fromFile(photoFile)
+                    val msg = "사진 캡쳐 성공 : $savedUri"
+                    Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
+                    Log.d(TAG, msg)
+                }
+
+                override fun onError(exception: ImageCaptureException) {
+                    // 이미지 캡처에 실패하거나 이미지 캡처 저장에 실패한 경우 오류 사례를 추가하여 실패했음을 기록
+                    Log.e(TAG, "사진 캡쳐 실패 : ${exception.message}", exception)
+                }
+            }
+        )
+
     }
 
     /**
@@ -171,7 +271,7 @@ class MainActivity : AppCompatActivity() {
         imageToBitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
         val byteArray = byteArrayOutputStream.toByteArray()
 
-        val base64Str = Base64.encodeToString(byteArray, Base64.DEFAULT);
+        val base64Str = encodeToString(byteArray, DEFAULT);
         Log.d("base64 ::::::::: ", base64Str)
 
 
@@ -188,9 +288,9 @@ class MainActivity : AppCompatActivity() {
         // Image To base64
         val formData = PostImage(base64Str, tempImageName)
         service.postBase64(formData)
-            .enqueue(object : retrofit2.Callback<ResponseCode> {
+            .enqueue(object : Callback<ResponseCode> {
                 override fun onResponse(
-                    call: retrofit2.Call<ResponseCode>,
+                    call: Call<ResponseCode>,
                     response: Response<ResponseCode>
                 ) {
                     val result = response.body().toString();
@@ -199,7 +299,7 @@ class MainActivity : AppCompatActivity() {
                     Log.d("종료 시간 ::", "${System.currentTimeMillis()}");
                 }
 
-                override fun onFailure(call: retrofit2.Call<ResponseCode>, t: Throwable) {
+                override fun onFailure(call: Call<ResponseCode>, t: Throwable) {
                     Log.e("ERROR_CALL", call.toString())
                     Log.e("ERROR", t.toString())
                 }
@@ -213,10 +313,10 @@ class MainActivity : AppCompatActivity() {
      */
     private fun getBase64(service: ImageApi) {
         service.getBase64(imageBase64 = "asdsd")
-            .enqueue(object : retrofit2.Callback<ResponseCode> {
+            .enqueue(object : Callback<ResponseCode> {
                 // 응답을 받는 경우
                 override fun onResponse(
-                    call: retrofit2.Call<ResponseCode>,
+                    call: Call<ResponseCode>,
                     response: Response<ResponseCode>
                 ) {
                     // 200 / 300
@@ -229,7 +329,7 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 // 응답에 실패하는 경우
-                override fun onFailure(call: retrofit2.Call<ResponseCode>, t: Throwable) {
+                override fun onFailure(call: Call<ResponseCode>, t: Throwable) {
                     Log.e("ERROR_CALL", call.toString())
                     Log.e("ERROR", t.toString())
                 }
@@ -241,7 +341,7 @@ class MainActivity : AppCompatActivity() {
      */
     private fun okHttpClinentApi() {
         val okHttpClient = OkHttpClient()
-        val request: okhttp3.Request = okhttp3.Request.Builder().url("$API_BASE_URL/").build()
+        val request: Request = Request.Builder().url("$API_BASE_URL/").build()
 
         okHttpClient.newCall(request).enqueue(object : okhttp3.Callback {
             override fun onFailure(call: okhttp3.Call, e: IOException) {
@@ -257,4 +357,36 @@ class MainActivity : AppCompatActivity() {
             }
         })
     }
+
+    /**
+     * 이미지 분석이 가능하다.
+     */
+    private class LuminosityAnalyzer(private val listener: LumaListener) : ImageAnalysis.Analyzer {
+
+        private fun ByteBuffer.toByteArray(): ByteArray {
+            rewind()    // Rewind the buffer to zero
+            val data = ByteArray(remaining())
+            get(data)   // Copy the buffer into a byte array
+            return data // Return the byte array
+        }
+
+        override fun analyze(image: ImageProxy) {
+
+            val buffer = image.planes[0].buffer
+            val data = buffer.toByteArray()
+            val pixels = data.map { it.toInt() and 0xFF }
+            val luma = pixels.average()
+
+            // 카메라 회전 각도 (카메라 이미지 회전이 아니라, 디바이스 retation 이다.)
+            val rotationDegrees = image.imageInfo.rotationDegrees
+            Log.d(TAG, "회전 각도 : $rotationDegrees")
+
+            // 평균 이미지 광도 리스너 반환
+            listener(luma)
+
+            image.close()
+        }
+    }
 }
+
+typealias LumaListener = (luma: Double) -> Unit
