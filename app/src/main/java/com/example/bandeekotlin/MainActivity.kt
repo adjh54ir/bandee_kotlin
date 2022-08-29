@@ -3,7 +3,7 @@ package com.example.bandeekotlin
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
+import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Bundle
@@ -17,9 +17,11 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.example.bandeekotlin.*
 import com.example.bandeekotlin.`interface`.ImageApi
 import com.example.bandeekotlin.model.PostImage
 import com.example.bandeekotlin.model.ResponseCode
+import com.example.bandeekotlin.common.CommonUtils
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import retrofit2.Call
@@ -28,13 +30,14 @@ import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.io.*
+import java.lang.Thread.sleep
 import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.time.ExperimentalTime
-import kotlin.time.measureTimedValue
+
 
 private const val TAG = "CameraXBasic"
 
@@ -60,11 +63,11 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         connectionCamera(); // 카메라 연결
-        //createRetrofitApi(); // Retrofit2 연결
+//        createRetrofitApi(); // Retrofit2 연결
     }
 
     /**
-     * 카메라 연결
+     * [API] 최초 카메라 연결
      */
     private fun connectionCamera() {
 
@@ -87,7 +90,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 권한 승인 결과
+     * [API] 카메라 권한 승인 결과
      */
     override fun onRequestPermissionsResult(
         requestCode: Int,
@@ -107,7 +110,7 @@ class MainActivity : AppCompatActivity() {
 
 
     /**
-     * 카메라 시작
+     * [API] 카메라 시작
      */
     private fun startCamera() {
 
@@ -121,13 +124,13 @@ class MainActivity : AppCompatActivity() {
             val preview = Preview.Builder()
                 .build()
                 .also {
+
                     // Preview객체를 초기화하고 빌드를 호출하고 뷰파인더에서 표면 공급자를 가져온 다음 미리보기에서 설정합니다.
                     val viewFinder: PreviewView = findViewById(R.id.viewFinder)
                     it.setSurfaceProvider(viewFinder.surfaceProvider)
                 }
 
-            imageCapture = ImageCapture.Builder()
-                .build()
+            imageCapture = ImageCapture.Builder().build()
 
             // 평균 이미지 광도
             var imageLuminosityAnalyzer = ImageAnalysis.Builder()
@@ -163,7 +166,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 사진 찍기
+     * [API] 버튼을 눌러서 사진 찍기
      */
     private fun takePhoto() {
 
@@ -204,7 +207,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 권한 체크
+     * [API] 권한 체크
      */
     private fun allPermissionGranted() = REQUIRED_PERMISSION.all {
         ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
@@ -238,14 +241,14 @@ class MainActivity : AppCompatActivity() {
             .build()
         val service = imageService.create(ImageApi::class.java)
         // API 로 반복 통신 수행
-        val mt = measureTimedValue {
-            // 1초에 2번씩 수행
-            for (i in 1..10) {
-                Log.d("시간 시간 ::", "${System.currentTimeMillis()}");
-                postBase64(service);        // API 호출
-            }
-        }
-        Log.d("측정 시간!!!!", "${mt}");
+//        val mt = measureTimedValue {
+//            // 1초에 2번씩 수행
+//            for (i in 1..10) {
+//                Log.d("시간 시간 ::", "${System.currentTimeMillis()}");
+        postBase64(service);        // API 호출
+//            }
+//        }
+//        Log.d("측정 시간!!!!", "${mt}");
     }
 
 
@@ -358,6 +361,7 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
+
     /**
      * 이미지 분석이 가능하다.
      */
@@ -371,6 +375,46 @@ class MainActivity : AppCompatActivity() {
         }
 
         override fun analyze(image: ImageProxy) {
+            // 1. ImageProxy를 bitmap으로 변경
+            val bitmap: Bitmap = imageProxyToBitmap(image)
+
+            // 2. Bitmap -> ByteArr 배열
+            val byteArrayOutputStream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
+            val byteArray = byteArrayOutputStream.toByteArray()
+
+            // 3. Base64 전환
+            val base64Str = encodeToString(byteArray, DEFAULT);
+            Log.d("base64 ::::::::: ", base64Str)
+
+            // 4. Retrofit2 기반의 POST 전송
+            val tempImageName = "image1";
+            val imageService = Retrofit
+                .Builder()
+                .baseUrl("http://192.168.0.4:5000")
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+            val service = imageService.create(ImageApi::class.java)
+
+            val formData = PostImage(base64Str, tempImageName)
+            service.postBase64(formData)
+                .enqueue(object : Callback<ResponseCode> {
+                    override fun onResponse(
+                        call: Call<ResponseCode>,
+                        response: Response<ResponseCode>
+                    ) {
+                        val result = response.body().toString();
+                        Log.d("API RESPONSE", result)
+                        sleep(1000)     // TODO: 타이머 지정 1초당 1건씩 수행
+                        Log.d("종료 시간 ::", "${System.currentTimeMillis()}");
+                    }
+
+                    override fun onFailure(call: Call<ResponseCode>, t: Throwable) {
+                        Log.e("ERROR_CALL", call.toString())
+                        Log.e("ERROR", t.toString())
+                    }
+                });
+
 
             val buffer = image.planes[0].buffer
             val data = buffer.toByteArray()
@@ -386,7 +430,36 @@ class MainActivity : AppCompatActivity() {
 
             image.close()
         }
+
+        /**
+         * 이미지 Proxy를 Bitmap으로 변경
+         */
+        fun imageProxyToBitmap(imageProxy: ImageProxy): Bitmap {
+            val planeProxies = imageProxy.planes
+            val yBuffer = planeProxies[0].buffer
+            val uBuffer = planeProxies[1].buffer
+            val vBuffer = planeProxies[2].buffer
+            val ySize = yBuffer.remaining()
+            val uSize = uBuffer.remaining()
+            val vSize = vBuffer.remaining()
+            val nv21 = ByteArray(ySize + uSize + vSize)
+
+            //U and V are swapped
+            yBuffer[nv21, 0, ySize]
+            vBuffer[nv21, ySize, vSize]
+            uBuffer[nv21, ySize + vSize, uSize]
+            val yuvImage =
+                YuvImage(nv21, ImageFormat.NV21, imageProxy.width, imageProxy.height, null)
+            val out = ByteArrayOutputStream()
+            yuvImage.compressToJpeg(Rect(0, 0, yuvImage.width, yuvImage.height), 100, out)
+            val imageBytes = out.toByteArray()
+            return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+        }
+
+
     }
+
+
 }
 
 typealias LumaListener = (luma: Double) -> Unit
