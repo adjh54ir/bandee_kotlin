@@ -1,10 +1,20 @@
 package com.example.bandeekotlin.common
 
 import android.graphics.*
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
+import android.util.Base64
+import android.util.Log
 import androidx.camera.core.ImageProxy
+import androidx.core.content.ContextCompat
+import com.example.bandeekotlin.*
 import java.io.ByteArrayOutputStream
+import java.io.*
+import java.util.*
+import android.content.Context;
 
-interface CommonUtils {
+object CommonUtils {
+
     /**
      * 이미지 Proxy를 Bitmap으로 변경
      */
@@ -29,4 +39,33 @@ interface CommonUtils {
         val imageBytes = out.toByteArray()
         return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
     }
+
+    /**
+     * image to Base64
+     * STEP1: 내 디렉토리 내에서 실제 이미지 파일을 받는다
+     * STEP2: 이미지 파일을 Bitmap 형태로 변경한다
+     * STEP3: Bitmap -> ByteArr로 변경
+     * STEP4: ByteArr -> String으로 변경
+     */
+    fun imageToBase64(context: Context): String {
+
+        // 1. 실제 이미지 파일
+        val image1: Drawable? = ContextCompat.getDrawable(context, R.drawable.image_3);
+
+        // 2. 실제 이미지 파일 -> Bitmap
+        val bitmapDrawable = image1 as BitmapDrawable
+        val imageToBitmap: Bitmap = bitmapDrawable.bitmap
+
+        // 3. Bitmap -> ByteArr 배열
+        val byteArrayOutputStream = ByteArrayOutputStream()
+        imageToBitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
+        val byteArray = byteArrayOutputStream.toByteArray()
+
+        val base64Str = Base64.encodeToString(byteArray, Base64.DEFAULT);
+        Log.d("base64 ::::::::: ", base64Str)
+
+        return base64Str
+    }
+
+
 }

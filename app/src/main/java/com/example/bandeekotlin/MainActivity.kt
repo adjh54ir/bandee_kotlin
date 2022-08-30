@@ -1,10 +1,11 @@
 package com.example.bandeekotlin
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Bundle
 import android.util.Base64.*
@@ -19,11 +20,12 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.bandeekotlin.*
 import com.example.bandeekotlin.`interface`.ImageApi
+import com.example.bandeekotlin.common.CommonUtils
 import com.example.bandeekotlin.model.PostImage
 import com.example.bandeekotlin.model.ResponseCode
-import com.example.bandeekotlin.common.CommonUtils
-import okhttp3.OkHttpClient
-import okhttp3.Request
+import okhttp3.MediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -43,7 +45,6 @@ private const val TAG = "CameraXBasic"
 
 class MainActivity : AppCompatActivity() {
 
-
     // 시스템 환경설정 - 네트워크에 나와있는 IP주소에 따라서 지정을 한다.
     private val API_BASE_URL = "http://192.168.0.4:5000"  // 로컬 디바이스
 
@@ -62,9 +63,62 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        connectionCamera(); // 카메라 연결
+//        connectionCamera(); // 카메라 연결
 //        createRetrofitApi(); // Retrofit2 연결
+        sendMultiPart();
     }
+
+
+    /**
+     * Multi-part를 이용하여 이미지 전송
+     */
+    private fun sendMultiPart() {
+        // 1. 실제 이미지 파일
+        val image1 = R.drawable.image_3
+
+
+
+        // 2. 실제 이미지 파일 -> Bitmap
+        val drawable = getDrawable(image1)
+        val bitmapDrawable = drawable as BitmapDrawable
+        val imageToBitmap: Bitmap = bitmapDrawable.bitmap
+//
+//        // 3. Bitmap -> ByteArr 배열
+        val byteArrayOutputStream = ByteArrayOutputStream()
+        imageToBitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
+        val byteArray = byteArrayOutputStream.toByteArray()
+
+//        val file = File(R.drawable.image_3)
+        val requestFile = RequestBody.create(MediaType.parse("image/*"), byteArray)
+        val body = MultipartBody.Part.createFormData("proFile", "tests", requestFile);
+        Log.d("Multipart !!!!!!!!!", "${body}")
+
+        val imageService = Retrofit
+            .Builder()
+            .baseUrl(API_BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+        val service = imageService.create(ImageApi::class.java)
+
+        service.postImage(body)
+            .enqueue(object : Callback<ResponseCode> {
+                override fun onResponse(
+                    call: Call<ResponseCode>,
+                    response: Response<ResponseCode>
+                ) {
+                    val result = response.body().toString();
+                    Log.d("API RESPONSE", result)
+
+                    Log.d("종료 시간 ::", "${System.currentTimeMillis()}");
+                }
+
+                override fun onFailure(call: Call<ResponseCode>, t: Throwable) {
+                    Log.e("ERROR_CALL", call.toString())
+                    Log.e("ERROR", t.toString())
+                }
+            });
+    }
+
 
     /**
      * [API] 최초 카메라 연결
@@ -251,42 +305,11 @@ class MainActivity : AppCompatActivity() {
 //        Log.d("측정 시간!!!!", "${mt}");
     }
 
-
-    /**
-     * image to Base64
-     * STEP1: 내 디렉토리 내에서 실제 이미지 파일을 받는다
-     * STEP2: 이미지 파일을 Bitmap 형태로 변경한다
-     * STEP3: Bitmap -> ByteArr로 변경
-     * STEP4: ByteArr -> String으로 변경
-     */
-    private fun imageToBase64(): String {
-
-        // 1. 실제 이미지 파일
-        val image1 = R.drawable.image_3
-
-        // 2. 실제 이미지 파일 -> Bitmap
-        val drawable = getDrawable(image1)
-        val bitmapDrawable = drawable as BitmapDrawable
-        val imageToBitmap: Bitmap = bitmapDrawable.bitmap
-
-        // 3. Bitmap -> ByteArr 배열
-        val byteArrayOutputStream = ByteArrayOutputStream()
-        imageToBitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
-        val byteArray = byteArrayOutputStream.toByteArray()
-
-        val base64Str = encodeToString(byteArray, DEFAULT);
-        Log.d("base64 ::::::::: ", base64Str)
-
-
-        return base64Str
-    }
-
-
     /**
      * POST 방식으로 데이터 전송
      */
     private fun postBase64(service: ImageApi) {
-        val base64Str = imageToBase64();
+        val base64Str = CommonUtils.imageToBase64(this);
         val tempImageName = "image1";
         // Image To base64
         val formData = PostImage(base64Str, tempImageName)
@@ -307,7 +330,6 @@ class MainActivity : AppCompatActivity() {
                     Log.e("ERROR", t.toString())
                 }
             });
-
     }
 
 
@@ -339,28 +361,6 @@ class MainActivity : AppCompatActivity() {
             });
     }
 
-    /**
-     * OKHTTP를 이용한 API 연결 방식
-     */
-    private fun okHttpClinentApi() {
-        val okHttpClient = OkHttpClient()
-        val request: Request = Request.Builder().url("$API_BASE_URL/").build()
-
-        okHttpClient.newCall(request).enqueue(object : okhttp3.Callback {
-            override fun onFailure(call: okhttp3.Call, e: IOException) {
-                Log.e("ERROR_CALL", call.toString())
-                Log.e("ERROR", e.toString())
-            }
-
-            @SuppressLint("LongLogTag")
-            @Throws(IOException::class)  // called if we get a
-            override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
-                val result = response.body?.toString()
-                Log.d("안녕하세요 제발 수행되면 저에게 이야기좀 해주세요", "결과는 ${result}")
-            }
-        })
-    }
-
 
     /**
      * 이미지 분석이 가능하다.
@@ -376,7 +376,7 @@ class MainActivity : AppCompatActivity() {
 
         override fun analyze(image: ImageProxy) {
             // 1. ImageProxy를 bitmap으로 변경
-            val bitmap: Bitmap = imageProxyToBitmap(image)
+            val bitmap: Bitmap = CommonUtils.imageProxyToBitmap(image)
 
             // 2. Bitmap -> ByteArr 배열
             val byteArrayOutputStream = ByteArrayOutputStream()
@@ -405,7 +405,7 @@ class MainActivity : AppCompatActivity() {
                     ) {
                         val result = response.body().toString();
                         Log.d("API RESPONSE", result)
-                        sleep(1000)     // TODO: 타이머 지정 1초당 1건씩 수행
+                        sleep(5000)     // TODO: 타이머 지정 1초당 1건씩 수행
                         Log.d("종료 시간 ::", "${System.currentTimeMillis()}");
                     }
 
@@ -430,32 +430,6 @@ class MainActivity : AppCompatActivity() {
 
             image.close()
         }
-
-        /**
-         * 이미지 Proxy를 Bitmap으로 변경
-         */
-        fun imageProxyToBitmap(imageProxy: ImageProxy): Bitmap {
-            val planeProxies = imageProxy.planes
-            val yBuffer = planeProxies[0].buffer
-            val uBuffer = planeProxies[1].buffer
-            val vBuffer = planeProxies[2].buffer
-            val ySize = yBuffer.remaining()
-            val uSize = uBuffer.remaining()
-            val vSize = vBuffer.remaining()
-            val nv21 = ByteArray(ySize + uSize + vSize)
-
-            //U and V are swapped
-            yBuffer[nv21, 0, ySize]
-            vBuffer[nv21, ySize, vSize]
-            uBuffer[nv21, ySize + vSize, uSize]
-            val yuvImage =
-                YuvImage(nv21, ImageFormat.NV21, imageProxy.width, imageProxy.height, null)
-            val out = ByteArrayOutputStream()
-            yuvImage.compressToJpeg(Rect(0, 0, yuvImage.width, yuvImage.height), 100, out)
-            val imageBytes = out.toByteArray()
-            return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-        }
-
 
     }
 
