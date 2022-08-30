@@ -8,5 +8,4 @@ data class PostImage(
 
     @SerializedName("imageName")
     private val imageName: String = "",
-
-    )
+)

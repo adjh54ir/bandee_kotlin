@@ -6,7 +6,6 @@ import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Bundle
-import android.system.Os.mkdir
 import android.util.Base64.*
 import android.util.Log
 import android.widget.Button
@@ -17,8 +16,8 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.example.bandeekotlin.*
 import com.example.bandeekotlin.`interface`.ImageApi
+import com.example.bandeekotlin.common.ApiConnUtils.retrofitConnection
 import com.example.bandeekotlin.common.CommonUtils
 import com.example.bandeekotlin.model.PostImage
 import com.example.bandeekotlin.model.ResponseCode
@@ -28,9 +27,6 @@ import okhttp3.RequestBody
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
-import retrofit2.http.Multipart
 import java.io.*
 import java.lang.Thread.sleep
 import java.nio.ByteBuffer
@@ -38,15 +34,11 @@ import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import kotlin.time.ExperimentalTime
 
 
 private const val TAG = "CameraXBasic"
 
 class MainActivity : AppCompatActivity() {
-
-    // 시스템 환경설정 - 네트워크에 나와있는 IP주소에 따라서 지정을 한다.
-    private val API_BASE_URL = "http://192.168.0.4:5000"  // 로컬 디바이스
 
     companion object {
         private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
@@ -63,13 +55,10 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-//        connectionCamera(); // 카메라 연결
-//        createRetrofitApi(); // Retrofit2 연결
-        sendMultiPart();
+//        connectionCamera(); // 카메라 연결 기능
+//        createRetrofitApi(); // Retrofit2 연결 기능
+        sendMultiPart() // Multi-part를 이용하여 이미지 전송
     }
-
-
-
 
     /**
      * Multi-part를 이용하여 이미지 전송
@@ -79,34 +68,28 @@ class MainActivity : AppCompatActivity() {
         // 여러 file들을 담아줄 ArrayList
         val fileList: ArrayList<MultipartBody.Part> = ArrayList()
 
+        // 1. 실제 이미지 파일
+        val image1 = R.drawable.image_3
+
+        // 2. 실제 이미지 파일 -> Bitmap
+        val drawable = getDrawable(image1)
+        val bitmapDrawable = drawable as BitmapDrawable
+        val imageToBitmap: Bitmap = bitmapDrawable.bitmap
+        // 3. Bitmap -> ByteArr 배열
+        val byteArrayOutputStream = ByteArrayOutputStream()
+        imageToBitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
+        val byteArray = byteArrayOutputStream.toByteArray()
+
         for (i: Int in 1..10) {
-            // 1. 실제 이미지 파일
-            val image1 = R.drawable.image_3
-
-            // 2. 실제 이미지 파일 -> Bitmap
-            val drawable = getDrawable(image1)
-            val bitmapDrawable = drawable as BitmapDrawable
-            val imageToBitmap: Bitmap = bitmapDrawable.bitmap
-            // 3. Bitmap -> ByteArr 배열
-            val byteArrayOutputStream = ByteArrayOutputStream()
-            imageToBitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
-            val byteArray = byteArrayOutputStream.toByteArray()
-
-            var fileName: String = "photo$i.png"
+            val fileName = "photo$i.png"
             val requestFile = RequestBody.create(MediaType.parse("image/*"), byteArray)
-            val body = MultipartBody.Part.createFormData("imageFile", fileName, requestFile);
-            Log.d("Multipart !!!!!!!!!", "${body}")
-
+            val body = MultipartBody.Part.createFormData("imageFile", fileName, requestFile)
+            Log.d("Multipart !!!!!!!!!", "$body")
             fileList.add(body)
         }
 
-
-        val imageService = Retrofit
-            .Builder()
-            .baseUrl(API_BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-        val service = imageService.create(ImageApi::class.java)
+        val service: ImageApi =
+            retrofitConnection()    // [API] 이미지 전송을 위한 Retrofit2 기반의 연결 함수
 
         service.postImage(fileList)
             .enqueue(
@@ -115,22 +98,21 @@ class MainActivity : AppCompatActivity() {
                         call: Call<ResponseCode>,
                         response: Response<ResponseCode>
                     ) {
-                        val result = response.body().toString();
+                        val result = response.body().toString()
                         Log.d("API RESPONSE", result)
-
-                        Log.d("종료 시간 ::", "${System.currentTimeMillis()}");
+                        Log.d("종료 시간 ::", "${System.currentTimeMillis()}")
                     }
 
                     override fun onFailure(call: Call<ResponseCode>, t: Throwable) {
                         Log.e("ERROR_CALL", call.toString())
                         Log.e("ERROR", t.toString())
                     }
-                });
+                })
     }
 
 
     /**
-     * [API] 최초 카메라 연결
+     * 최초 카메라 연결
      */
     private fun connectionCamera() {
 
@@ -153,7 +135,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * [API] 카메라 권한 승인 결과
+     * 카메라 권한 승인 결과
      */
     override fun onRequestPermissionsResult(
         requestCode: Int,
@@ -173,13 +155,13 @@ class MainActivity : AppCompatActivity() {
 
 
     /**
-     * [API] 카메라 시작
+     * 카메라 시작
      */
     private fun startCamera() {
 
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
-        cameraProviderFuture.addListener(Runnable { // 카메라의 수명 주기를 LifecycleOwner응용 프로그램 프로세스 내에서 바인딩하는 데 사용됩니다 .
+        cameraProviderFuture.addListener({ // 카메라의 수명 주기를 LifecycleOwner응용 프로그램 프로세스 내에서 바인딩하는 데 사용됩니다 .
 
             // 카메라의 수명 주기를 수명 주기 소유자에게 바인딩하는 데 사용됩니다.
             val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
@@ -196,7 +178,7 @@ class MainActivity : AppCompatActivity() {
             imageCapture = ImageCapture.Builder().build()
 
             // 평균 이미지 광도
-            var imageLuminosityAnalyzer = ImageAnalysis.Builder()
+            val imageLuminosityAnalyzer = ImageAnalysis.Builder()
                 .build()
                 .also {
                     it.setAnalyzer(cameraExcutor, LuminosityAnalyzer { luma ->
@@ -229,7 +211,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * [API] 버튼을 눌러서 사진 찍기
+     * 버튼을 눌러서 사진 찍기
      */
     private fun takePhoto() {
 
@@ -270,7 +252,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * [API] 권한 체크
+     * 권한 체크
      */
     private fun allPermissionGranted() = REQUIRED_PERMISSION.all {
         ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
@@ -292,34 +274,14 @@ class MainActivity : AppCompatActivity() {
 
 // ============================================================================================
 
-    /**
-     * Retrofit을 이용한 API 통신 테스트
-     */
-    @OptIn(ExperimentalTime::class)
-    private fun createRetrofitApi() {
-        val imageService = Retrofit
-            .Builder()
-            .baseUrl(API_BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-        val service = imageService.create(ImageApi::class.java)
-        // API 로 반복 통신 수행
-//        val mt = measureTimedValue {
-//            // 1초에 2번씩 수행
-//            for (i in 1..10) {
-//                Log.d("시간 시간 ::", "${System.currentTimeMillis()}");
-        postBase64(service);        // API 호출
-//            }
-//        }
-//        Log.d("측정 시간!!!!", "${mt}");
-    }
 
     /**
      * POST 방식으로 데이터 전송
      */
-    private fun postBase64(service: ImageApi) {
-        val base64Str = CommonUtils.imageToBase64(this);
-        val tempImageName = "image1";
+    private fun postBase64() {
+        val service: ImageApi = retrofitConnection()    // [API] 이미지 전송을 위한 Retrofit2 기반의 연결 함수
+        val base64Str = CommonUtils.imageToBase64(this)
+        val tempImageName = "image1"
         // Image To base64
         val formData = PostImage(base64Str, tempImageName)
         service.postBase64(formData)
@@ -328,24 +290,25 @@ class MainActivity : AppCompatActivity() {
                     call: Call<ResponseCode>,
                     response: Response<ResponseCode>
                 ) {
-                    val result = response.body().toString();
+                    val result = response.body().toString()
                     Log.d("API RESPONSE", result)
 
-                    Log.d("종료 시간 ::", "${System.currentTimeMillis()}");
+                    Log.d("종료 시간 ::", "${System.currentTimeMillis()}")
                 }
 
                 override fun onFailure(call: Call<ResponseCode>, t: Throwable) {
                     Log.e("ERROR_CALL", call.toString())
                     Log.e("ERROR", t.toString())
                 }
-            });
+            })
     }
 
 
     /**
      * GET 방식을 통한 데이터 전달 방식
      */
-    private fun getBase64(service: ImageApi) {
+    private fun getBase64() {
+        val service: ImageApi = retrofitConnection()    // [API] 이미지 전송을 위한 Retrofit2 기반의 연결 함수
         service.getBase64(imageBase64 = "asdsd")
             .enqueue(object : Callback<ResponseCode> {
                 // 응답을 받는 경우
@@ -355,8 +318,8 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     // 200 / 300
                     if (response.isSuccessful) {
-                        val result = response.body().toString();
-                        Log.d("API RESPONSE", "${result}")
+                        val result = response.body().toString()
+                        Log.d("API RESPONSE", result)
                     } else {
                         Log.e("API FAIL", "실패입니다!!!!")
                     }
@@ -367,7 +330,7 @@ class MainActivity : AppCompatActivity() {
                     Log.e("ERROR_CALL", call.toString())
                     Log.e("ERROR", t.toString())
                 }
-            });
+            })
     }
 
 
@@ -393,17 +356,12 @@ class MainActivity : AppCompatActivity() {
             val byteArray = byteArrayOutputStream.toByteArray()
 
             // 3. Base64 전환
-            val base64Str = encodeToString(byteArray, DEFAULT);
+            val base64Str = encodeToString(byteArray, DEFAULT)
             Log.d("base64 ::::::::: ", base64Str)
 
             // 4. Retrofit2 기반의 POST 전송
-            val tempImageName = "image1";
-            val imageService = Retrofit
-                .Builder()
-                .baseUrl("http://192.168.0.4:5000")
-                .addConverterFactory(GsonConverterFactory.create())
-                .build()
-            val service = imageService.create(ImageApi::class.java)
+            val tempImageName = "image1"
+            val service: ImageApi = retrofitConnection()    // [API] 이미지 전송을 위한 Retrofit2 기반의 연결 함수
 
             val formData = PostImage(base64Str, tempImageName)
             service.postBase64(formData)
@@ -412,17 +370,17 @@ class MainActivity : AppCompatActivity() {
                         call: Call<ResponseCode>,
                         response: Response<ResponseCode>
                     ) {
-                        val result = response.body().toString();
+                        val result = response.body().toString()
                         Log.d("API RESPONSE", result)
                         sleep(5000)     // TODO: 타이머 지정 1초당 1건씩 수행
-                        Log.d("종료 시간 ::", "${System.currentTimeMillis()}");
+                        Log.d("종료 시간 ::", "${System.currentTimeMillis()}")
                     }
 
                     override fun onFailure(call: Call<ResponseCode>, t: Throwable) {
                         Log.e("ERROR_CALL", call.toString())
                         Log.e("ERROR", t.toString())
                     }
-                });
+                })
 
 
             val buffer = image.planes[0].buffer

@@ -1,24 +1,22 @@
 package com.example.bandeekotlin.common
 
 import android.annotation.SuppressLint
-import android.graphics.drawable.Drawable
 import android.util.Log
-import androidx.core.content.ContextCompat
-import androidx.core.content.ContextCompat.getDrawable
-import com.example.bandeekotlin.R
+import com.example.bandeekotlin.`interface`.ImageApi
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 import java.io.IOException
 
-object ApiConnectUtils {
+object ApiConnUtils {
 
-
-    private val API_BASE_URL = "http://192.168.0.4:5000"  // 로컬 디바이스
+    private const val API_BASE_URL = "http://192.168.0.4:5000"  // 로컬 디바이스
 
     /**
-     * OKHTTP를 이용한 API 연결 방식
+     * 'OKHTTP'를 이용한 API 연결 방식
      */
-    private fun okHttpClinentApi() {
+    private fun okHttpClientApi() {
         val okHttpClient = OkHttpClient()
         val request: Request = Request.Builder().url("$API_BASE_URL/").build()
 
@@ -35,6 +33,18 @@ object ApiConnectUtils {
 //                Log.d("안녕하세요 제발 수행되면 저에게 이야기좀 해주세요", "결과는 ${result}")
             }
         })
+    }
+
+    /**
+     * 이미지 전송을 위한 Retrofit2 기반의 연결 함수
+     */
+    fun retrofitConnection(): ImageApi {
+        val imageService = Retrofit
+            .Builder()
+            .baseUrl(API_BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+        return imageService.create(ImageApi::class.java)
     }
 
 }

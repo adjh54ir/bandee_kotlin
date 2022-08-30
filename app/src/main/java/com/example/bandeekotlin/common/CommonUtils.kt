@@ -9,7 +9,7 @@ import androidx.camera.core.ImageProxy
 import androidx.core.content.ContextCompat
 import com.example.bandeekotlin.*
 import java.io.ByteArrayOutputStream
-import android.content.Context;
+import android.content.Context
 
 object CommonUtils {
 
@@ -48,7 +48,7 @@ object CommonUtils {
     fun imageToBase64(context: Context): String {
 
         // 1. 실제 이미지 파일
-        val image1: Drawable? = ContextCompat.getDrawable(context, R.drawable.image_3);
+        val image1: Drawable? = ContextCompat.getDrawable(context, R.drawable.image_3)
 
         // 2. 실제 이미지 파일 -> Bitmap
         val bitmapDrawable = image1 as BitmapDrawable
@@ -59,7 +59,7 @@ object CommonUtils {
         imageToBitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
         val byteArray = byteArrayOutputStream.toByteArray()
 
-        val base64Str = Base64.encodeToString(byteArray, Base64.DEFAULT);
+        val base64Str = Base64.encodeToString(byteArray, Base64.DEFAULT)
         Log.d("base64 ::::::::: ", base64Str)
 
         return base64Str
