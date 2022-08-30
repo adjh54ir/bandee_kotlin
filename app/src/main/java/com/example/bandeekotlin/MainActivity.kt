@@ -2,12 +2,11 @@ package com.example.bandeekotlin
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
 import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
-import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Bundle
+import android.system.Os.mkdir
 import android.util.Base64.*
 import android.util.Log
 import android.widget.Button
@@ -31,6 +30,7 @@ import retrofit2.Callback
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.Multipart
 import java.io.*
 import java.lang.Thread.sleep
 import java.nio.ByteBuffer
@@ -69,29 +69,37 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+
+
     /**
      * Multi-part를 이용하여 이미지 전송
      */
     private fun sendMultiPart() {
-        // 1. 실제 이미지 파일
-        val image1 = R.drawable.image_3
 
+        // 여러 file들을 담아줄 ArrayList
+        val fileList: ArrayList<MultipartBody.Part> = ArrayList()
 
+        for (i: Int in 1..10) {
+            // 1. 실제 이미지 파일
+            val image1 = R.drawable.image_3
 
-        // 2. 실제 이미지 파일 -> Bitmap
-        val drawable = getDrawable(image1)
-        val bitmapDrawable = drawable as BitmapDrawable
-        val imageToBitmap: Bitmap = bitmapDrawable.bitmap
-//
-//        // 3. Bitmap -> ByteArr 배열
-        val byteArrayOutputStream = ByteArrayOutputStream()
-        imageToBitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
-        val byteArray = byteArrayOutputStream.toByteArray()
+            // 2. 실제 이미지 파일 -> Bitmap
+            val drawable = getDrawable(image1)
+            val bitmapDrawable = drawable as BitmapDrawable
+            val imageToBitmap: Bitmap = bitmapDrawable.bitmap
+            // 3. Bitmap -> ByteArr 배열
+            val byteArrayOutputStream = ByteArrayOutputStream()
+            imageToBitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
+            val byteArray = byteArrayOutputStream.toByteArray()
 
-//        val file = File(R.drawable.image_3)
-        val requestFile = RequestBody.create(MediaType.parse("image/*"), byteArray)
-        val body = MultipartBody.Part.createFormData("proFile", "tests", requestFile);
-        Log.d("Multipart !!!!!!!!!", "${body}")
+            var fileName: String = "photo$i.png"
+            val requestFile = RequestBody.create(MediaType.parse("image/*"), byteArray)
+            val body = MultipartBody.Part.createFormData("imageFile", fileName, requestFile);
+            Log.d("Multipart !!!!!!!!!", "${body}")
+
+            fileList.add(body)
+        }
+
 
         val imageService = Retrofit
             .Builder()
@@ -100,23 +108,24 @@ class MainActivity : AppCompatActivity() {
             .build()
         val service = imageService.create(ImageApi::class.java)
 
-        service.postImage(body)
-            .enqueue(object : Callback<ResponseCode> {
-                override fun onResponse(
-                    call: Call<ResponseCode>,
-                    response: Response<ResponseCode>
-                ) {
-                    val result = response.body().toString();
-                    Log.d("API RESPONSE", result)
+        service.postImage(fileList)
+            .enqueue(
+                object : Callback<ResponseCode> {
+                    override fun onResponse(
+                        call: Call<ResponseCode>,
+                        response: Response<ResponseCode>
+                    ) {
+                        val result = response.body().toString();
+                        Log.d("API RESPONSE", result)
 
-                    Log.d("종료 시간 ::", "${System.currentTimeMillis()}");
-                }
+                        Log.d("종료 시간 ::", "${System.currentTimeMillis()}");
+                    }
 
-                override fun onFailure(call: Call<ResponseCode>, t: Throwable) {
-                    Log.e("ERROR_CALL", call.toString())
-                    Log.e("ERROR", t.toString())
-                }
-            });
+                    override fun onFailure(call: Call<ResponseCode>, t: Throwable) {
+                        Log.e("ERROR_CALL", call.toString())
+                        Log.e("ERROR", t.toString())
+                    }
+                });
     }
 
 
@@ -281,7 +290,7 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    // ============================================================================================
+// ============================================================================================
 
     /**
      * Retrofit을 이용한 API 통신 테스트

@@ -29,8 +29,10 @@ interface ImageApi {
     @Multipart
     @POST("/postImage")
     fun postImage(
-        @Part image: MultipartBody.Part,        // 단건 전송
+//        @Part image: MultipartBody.Part,        // 단건 전송
+        @Part image: List<MultipartBody.Part>,        // 단건 전송
     ): Call<ResponseCode>
+
 
 
 //    @GET("/getFlask")

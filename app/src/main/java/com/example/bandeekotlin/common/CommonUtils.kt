@@ -9,8 +9,6 @@ import androidx.camera.core.ImageProxy
 import androidx.core.content.ContextCompat
 import com.example.bandeekotlin.*
 import java.io.ByteArrayOutputStream
-import java.io.*
-import java.util.*
 import android.content.Context;
 
 object CommonUtils {
