@@ -6,8 +6,6 @@ import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Bundle
-import android.os.Debug
-import android.util.Base64.*
 import android.util.Log
 import android.widget.Button
 import android.widget.Toast
@@ -17,7 +15,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.example.bandeekotlin.`interface`.ImageApi
+import com.example.bandeekotlin.camera.LuminosityAnalyzer
 import com.example.bandeekotlin.common.ApiConnUtils.retrofitConnection
 import com.example.bandeekotlin.common.CommonUtils
 import com.example.bandeekotlin.model.PostImage
@@ -29,95 +27,42 @@ import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 import java.io.*
-import java.lang.Thread.sleep
-import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 import kotlin.collections.ArrayList
 
 
-private const val TAG = "CameraXBasic"
+typealias LumaListener = (luma: Double) -> Unit
 
 class MainActivity : AppCompatActivity() {
 
+    /**
+     * 공통 변수에 대해서 선언
+     */
     companion object {
         private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
         private const val REQUEST_CODE_PERMISSIONS = 10
         private val REQUIRED_PERMISSION = arrayOf(Manifest.permission.CAMERA)
+        private var imageCapture: ImageCapture? = null
+        private lateinit var outputDirectory: File
+        private lateinit var cameraExcutor: ExecutorService
+        private const val TAG = "CameraXBasic"
     }
 
-    private var imageCapture: ImageCapture? = null
-
-    private lateinit var outputDirectory: File
-    private lateinit var cameraExcutor: ExecutorService
-
-    // 메인 페이지
+    /**
+     * [init] 최초 수행 함수
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         connectionCamera(); // 카메라 연결 기능
-//        createRetrofitApi(); // Retrofit2 연결 기능
 //        sendMultiPart() // Multi-part를 이용하여 이미지 전송
     }
 
     /**
-     * Multi-part를 이용하여 이미지 전송
-     */
-    private fun sendMultiPart() {
-
-        // 여러 file들을 담아줄 ArrayList
-        val fileList: ArrayList<MultipartBody.Part> = ArrayList()
-
-        // 1. 실제 이미지 파일
-        val image1 = R.drawable.image_3
-
-        // 2. 실제 이미지 파일 -> Bitmap
-        val drawable = getDrawable(image1)
-        val bitmapDrawable = drawable as BitmapDrawable
-        val imageToBitmap: Bitmap = bitmapDrawable.bitmap
-
-
-        // 3. Bitmap -> ByteArr 배열
-        val byteArrayOutputStream = ByteArrayOutputStream()
-        imageToBitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
-        val byteArray = byteArrayOutputStream.toByteArray()
-
-        for (i: Int in 1..10) {
-            val fileName = "photo$i.png"
-            val requestFile = RequestBody.create(MediaType.parse("image/*"), byteArray)
-            val body = MultipartBody.Part.createFormData("imageFile", fileName, requestFile)
-            Log.d("Multipart !!!!!!!!!", "$body")
-            fileList.add(body)
-        }
-
-        val service: ImageApi = retrofitConnection()    // [API] 이미지 전송을 위한 Retrofit2 기반의 연결 함수
-
-        // [API] 서비스 호출
-        service.postImage(fileList)
-            .enqueue(
-                object : Callback<ResponseCode> {
-                    override fun onResponse(
-                        call: Call<ResponseCode>,
-                        response: Response<ResponseCode>
-                    ) {
-                        val result = response.body().toString()
-                        Log.d("API RESPONSE", result)
-                        Log.d("종료 시간 ::", "${System.currentTimeMillis()}")
-                    }
-
-                    override fun onFailure(call: Call<ResponseCode>, t: Throwable) {
-                        Log.e("ERROR_CALL", call.toString())
-                        Log.e("ERROR", t.toString())
-                    }
-                })
-    }
-
-
-    /**
-     * 최초 카메라 연결
+     * [함수] CameraX 시작
      */
     private fun connectionCamera() {
 
@@ -140,7 +85,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 카메라 권한 승인 결과
+     * [함수] 카메라 권한 승인 결과
      */
     override fun onRequestPermissionsResult(
         requestCode: Int,
@@ -160,7 +105,7 @@ class MainActivity : AppCompatActivity() {
 
 
     /**
-     * 카메라 시작
+     * [함수] 카메라 시작
      */
     private fun startCamera() {
 
@@ -215,7 +160,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 버튼을 눌러서 사진 찍기
+     * [함수] 버튼을 눌러서 사진 찍기
      */
     private fun takePhoto() {
         // 이미지 캡처가 설정되기 전에 사진 버튼을 탭하면 null이 됩니다.
@@ -250,11 +195,10 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         )
-
     }
 
     /**
-     * 권한 체크
+     * [함수] 권한 체크
      */
     private fun allPermissionGranted() = REQUIRED_PERMISSION.all {
         ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
@@ -278,15 +222,61 @@ class MainActivity : AppCompatActivity() {
 
 
     /**
-     * POST 방식으로 데이터 전송
+     * [함수] multipart data-form 방식을 이용하여 이미지 전송 기능 함수
+     */
+    private fun sendMultiPart() {
+        // 여러 file들을 담아줄 ArrayList
+        val fileList: ArrayList<MultipartBody.Part> = ArrayList()
+
+        // 1. 실제 리소스 이미지 파일
+        val image1 = R.drawable.image_3
+
+        // 2. 실제 리소스 이미지 파일 -> Bitmap 변환
+        val drawable = getDrawable(image1)
+        val bitmapDrawable = drawable as BitmapDrawable
+        val imageToBitmap: Bitmap = bitmapDrawable.bitmap
+
+        // 3. Bitmap -> ByteArr 배열 변환
+        var byteArray = CommonUtils.bitmapToByteArr(imageToBitmap)
+
+        // 4. ByteArr -> Mutipart 형태로 변환
+        for (i: Int in 1..10) {
+            val fileName = "photo$i.png"
+            val requestFile = RequestBody.create(MediaType.parse("image/*"), byteArray)
+            val body = MultipartBody.Part.createFormData("imageFile", fileName, requestFile)
+            Log.d("Multipart !!!!!!!!!", "$body")
+            fileList.add(body)
+        }
+
+        // [API] 서비스 호출
+        retrofitConnection().postImage(fileList)
+            .enqueue(
+                object : Callback<ResponseCode> {
+                    override fun onResponse(
+                        call: Call<ResponseCode>,
+                        response: Response<ResponseCode>
+                    ) {
+                        val result = response.body().toString()
+                        Log.d("API RESPONSE", result)
+                        Log.d("종료 시간 ::", "${System.currentTimeMillis()}")
+                    }
+
+                    override fun onFailure(call: Call<ResponseCode>, t: Throwable) {
+                        Log.e("ERROR_CALL", call.toString())
+                        Log.e("ERROR", t.toString())
+                    }
+                })
+    }
+
+    /**
+     * [함수] POST 방식으로 BASE64 데이터 전송 기능 함수
      */
     private fun postBase64() {
-        val service: ImageApi = retrofitConnection()    // [API] 이미지 전송을 위한 Retrofit2 기반의 연결 함수
         val base64Str = CommonUtils.imageToBase64(this)
         val tempImageName = "image1"
         // Image To base64
         val formData = PostImage(base64Str, tempImageName)
-        service.postBase64(formData)
+        retrofitConnection().postBase64(formData)
             .enqueue(object : Callback<ResponseCode> {
                 override fun onResponse(
                     call: Call<ResponseCode>,
@@ -307,11 +297,10 @@ class MainActivity : AppCompatActivity() {
 
 
     /**
-     * GET 방식을 통한 데이터 전달 방식
+     * [함수] GET 방식으로 BASE64 데이터 전송 기능 함수
      */
     private fun getBase64() {
-        val service: ImageApi = retrofitConnection()    // [API] 이미지 전송을 위한 Retrofit2 기반의 연결 함수
-        service.getBase64(imageBase64 = "asdsd")
+        retrofitConnection().getBase64(imageBase64 = "asdsd")
             .enqueue(object : Callback<ResponseCode> {
                 // 응답을 받는 경우
                 override fun onResponse(
@@ -334,92 +323,6 @@ class MainActivity : AppCompatActivity() {
                 }
             })
     }
-
-
-    /**
-     * 이미지 분석을 수행함.
-     */
-    private class LuminosityAnalyzer(private val listener: LumaListener) : ImageAnalysis.Analyzer {
-
-        private var fileList: ArrayList<MultipartBody.Part> = ArrayList()
-
-        private fun ByteBuffer.toByteArray(): ByteArray {
-            rewind()    // Rewind the buffer to zero
-            val data = ByteArray(remaining())
-            get(data)   // Copy the buffer into a byte array
-            return data // Return the byte array
-        }
-
-        override fun analyze(image: ImageProxy) {
-            // [STEP1] Retrofit2 통신을 위한 연결
-            val service: ImageApi = retrofitConnection()    // [API] 이미지 전송을 위한 Retrofit2 기반의 연결 함수
-
-            // [STEP2] ImageProxy를 bitmap으로 변경
-            val bitmap: Bitmap = CommonUtils.imageProxyToBitmap(image)
-
-            // [STEP3] Bitmap -> ByteArr 배열
-            val byteArrayOutputStream = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
-            val byteArray = byteArrayOutputStream.toByteArray()
-
-            // [STEP4] ByteArr => Multipart
-            val i = (1..50000).random();
-            val fileName = "photo_$i.png"
-            val requestFile = RequestBody.create(MediaType.parse("image/*"), byteArray)
-            val body = MultipartBody.Part.createFormData("imageFile", fileName, requestFile)
-            fileList.add(body)
-
-            Log.d("배열의 누적 체크", "${fileList.size}")
-
-            // [STEP5] Multipart 배열이 30개가 되면 API 통신을 수행한다.
-            if (fileList.size >= 30) {
-                Log.d("전송 준비중!!!", "오예에에에에엥 시작!! ")
-                // [STEP6] [API] Multi-part를 이용한 데이터 전송
-                service.postImage(fileList)
-                    .enqueue(
-                        object : Callback<ResponseCode> {
-                            override fun onResponse(
-                                call: Call<ResponseCode>,
-                                response: Response<ResponseCode>
-                            ) {
-                                val result = response.body().toString()
-                                Log.d("API RESPONSE", result)
-                                Log.d("종료 시간 ::", "${System.currentTimeMillis()}")
-                            }
-
-                            override fun onFailure(call: Call<ResponseCode>, t: Throwable) {
-                                Log.e("ERROR_CALL", call.toString())
-                                Log.e("ERROR", t.toString())
-                            }
-                        })
-
-                Log.d("누적된 리스트를 확인하장 ~", "${fileList}")
-                // [STEP7] 5개가 완료되면 배열 비워주기
-                fileList.clear();
-            }
-
-
-            /**
-             * default Option
-             */
-            val buffer = image.planes[0].buffer
-            val data = buffer.toByteArray()
-
-            val pixels = data.map { it.toInt() and 0xFF }
-            val luma = pixels.average()
-
-            // 카메라 회전 각도 (카메라 이미지 회전이 아니라, 디바이스 retation 이다.)
-            val rotationDegrees = image.imageInfo.rotationDegrees
-            Log.d(TAG, "회전 각도 : $rotationDegrees")
-
-            // 평균 이미지 광도 리스너 반환
-            listener(luma)
-            image.close() // 사용된 이미지 삭제
-        }
-    }
 }
 
 
-
-
-typealias LumaListener = (luma: Double) -> Unit

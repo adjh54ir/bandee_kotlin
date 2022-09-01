@@ -14,7 +14,7 @@ import android.content.Context
 object CommonUtils {
 
     /**
-     * 이미지 Proxy를 Bitmap으로 변경
+     * 이미지 Proxy를 Bitmap으로 변경하는 함수
      */
     fun imageProxyToBitmap(imageProxy: ImageProxy): Bitmap {
         val planeProxies = imageProxy.planes
@@ -36,6 +36,15 @@ object CommonUtils {
         yuvImage.compressToJpeg(Rect(0, 0, yuvImage.width, yuvImage.height), 100, out)
         val imageBytes = out.toByteArray()
         return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+    }
+
+    /**
+     * bitmap을 ByteArr 형태로 변경하는 함수
+     */
+    fun bitmapToByteArr(bitmap: Bitmap): ByteArray {
+        val byteArrayOutputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
+        return byteArrayOutputStream.toByteArray();
     }
 
     /**

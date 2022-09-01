@@ -14,7 +14,7 @@ object ApiConnUtils {
     private const val API_BASE_URL = "http://192.168.0.4:5000"  // 로컬 디바이스
 
     /**
-     * 'OKHTTP'를 이용한 API 연결 방식
+     * [API Util] 'OKHTTP'를 이용한 API 연결 방식
      */
     private fun okHttpClientApi() {
         val okHttpClient = OkHttpClient()
@@ -29,14 +29,12 @@ object ApiConnUtils {
             @SuppressLint("LongLogTag")
             @Throws(IOException::class)  // called if we get a
             override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
-//                val result = response.body?.toString()
-//                Log.d("안녕하세요 제발 수행되면 저에게 이야기좀 해주세요", "결과는 ${result}")
             }
         })
     }
 
     /**
-     * 이미지 전송을 위한 Retrofit2 기반의 연결 함수
+     * [API Util] 이미지 전송을 위한 Retrofit2 기반의 연결 함수
      */
     fun retrofitConnection(): ImageApi {
         val imageService = Retrofit
