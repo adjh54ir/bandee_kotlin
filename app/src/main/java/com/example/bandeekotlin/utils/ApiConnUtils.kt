@@ -1,4 +1,4 @@
-package com.example.bandeekotlin.common
+package com.example.bandeekotlin.utils
 
 import android.annotation.SuppressLint
 import android.util.Log

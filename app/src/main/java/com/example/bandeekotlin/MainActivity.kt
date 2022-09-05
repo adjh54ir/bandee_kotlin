@@ -7,6 +7,7 @@ import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import android.view.Surface
 import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -16,8 +17,8 @@ import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.bandeekotlin.camera.LuminosityAnalyzer
-import com.example.bandeekotlin.common.ApiConnUtils.retrofitConnection
-import com.example.bandeekotlin.common.CommonUtils
+import com.example.bandeekotlin.utils.ApiConnUtils.retrofitConnection
+import com.example.bandeekotlin.utils.CommonUtils
 import com.example.bandeekotlin.model.PostImage
 import com.example.bandeekotlin.model.ResponseCode
 import okhttp3.MediaType
@@ -45,7 +46,7 @@ class MainActivity : AppCompatActivity() {
         private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
         private const val REQUEST_CODE_PERMISSIONS = 10
         private val REQUIRED_PERMISSION = arrayOf(Manifest.permission.CAMERA)
-        private var imageCapture: ImageCapture? = null
+        private var imageCaptureConfig: ImageCapture? = null
         private lateinit var outputDirectory: File
         private lateinit var cameraExcutor: ExecutorService
         private const val TAG = "CameraXBasic"
@@ -111,12 +112,13 @@ class MainActivity : AppCompatActivity() {
 
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
-        cameraProviderFuture.addListener({ // 카메라의 수명 주기를 LifecycleOwner응용 프로그램 프로세스 내에서 바인딩하는 데 사용됩니다 .
+        cameraProviderFuture.addListener({ // 카메라의 수명 주기를 LifecycleOwner 응용 프로그램 프로세스 내에서 바인딩하는 데 사용됩니다 .
 
             // 카메라의 수명 주기를 수명 주기 소유자에게 바인딩하는 데 사용됩니다.
             val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
 
-            val preview = Preview.Builder()
+            // [기능1] 미리보기(Preview)의 Option Setting
+            val previewConfig = Preview.Builder()
                 .build()
                 .also {
                     // Preview객체를 초기화하고 빌드를 호출하고 뷰파인더에서 표면 공급자를 가져온 다음 미리보기에서 설정합니다.
@@ -124,33 +126,33 @@ class MainActivity : AppCompatActivity() {
                     it.setSurfaceProvider(viewFinder.surfaceProvider)
                 }
 
-            imageCapture = ImageCapture.Builder().build()
+            // [기능2] 이미지 캡쳐의 Option Setting
+            imageCaptureConfig = ImageCapture.Builder().build()
 
-            // 평균 이미지 광도
+            // [기능3] 이미지 분석 Option Setting
             val imageLuminosityAnalyzer = ImageAnalysis.Builder()
                 .build()
                 .also {
                     it.setAnalyzer(cameraExcutor, LuminosityAnalyzer { luma ->
                         Log.d(TAG, "평균 광도 : $luma")
-                    })
+                    });
                 }
-
-            // 기본 뒤쪽 카메라 선택
+            // [기능4] 카메라 방향 Option Setting
             val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
 
             try {
                 // 사용한 binding 모두 해제
                 cameraProvider.unbindAll()
 
-                // bind 카메라
+
+                // bind 카메라 - 설정한 옵션에 대해서 라이프 사이클에 모두 세팅
                 cameraProvider.bindToLifecycle(
                     this,
                     cameraSelector,
-                    preview,
-                    imageCapture,
+                    previewConfig,
+                    imageCaptureConfig,
                     imageLuminosityAnalyzer
                 )
-
             } catch (exc: Exception) {
                 // 앱이 더 이상 포커스에 있지 않은 경우와 같이 이 코드가 실패할 수 있음
                 Log.e(TAG, "bind 에러", exc)
@@ -165,7 +167,7 @@ class MainActivity : AppCompatActivity() {
     private fun takePhoto() {
         // 이미지 캡처가 설정되기 전에 사진 버튼을 탭하면 null이 됩니다.
         // return문이 없으면 앱이 충돌합니다
-        val imageCapture = imageCapture ?: return
+        val imageCapture = imageCaptureConfig ?: return
 
         // 이미지를 저장할 타임 스탬프 출력 파일 생성
         val photoFile = File(
@@ -220,7 +222,6 @@ class MainActivity : AppCompatActivity() {
 
 // ============================================================================================
 
-
     /**
      * [함수] multipart data-form 방식을 이용하여 이미지 전송 기능 함수
      */
@@ -272,6 +273,8 @@ class MainActivity : AppCompatActivity() {
      * [함수] POST 방식으로 BASE64 데이터 전송 기능 함수
      */
     private fun postBase64() {
+
+
         val base64Str = CommonUtils.imageToBase64(this)
         val tempImageName = "image1"
         // Image To base64
@@ -284,10 +287,8 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     val result = response.body().toString()
                     Log.d("API RESPONSE", result)
-
                     Log.d("종료 시간 ::", "${System.currentTimeMillis()}")
                 }
-
                 override fun onFailure(call: Call<ResponseCode>, t: Throwable) {
                     Log.e("ERROR_CALL", call.toString())
                     Log.e("ERROR", t.toString())
