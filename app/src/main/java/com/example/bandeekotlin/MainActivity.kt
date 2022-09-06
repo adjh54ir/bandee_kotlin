@@ -1,11 +1,14 @@
 package com.example.bandeekotlin
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.os.Debug
+import android.os.Environment
 import android.util.Log
 import android.view.Surface
 import android.widget.Button
@@ -24,10 +27,14 @@ import com.example.bandeekotlin.model.ResponseCode
 import okhttp3.MediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import org.json.JSONArray
+import org.json.JSONObject
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 import java.io.*
+import java.nio.file.Files
+import java.nio.file.Paths
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
@@ -58,9 +65,56 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        connectionCamera(); // 카메라 연결 기능
+//        connectionCamera(); // 카메라 연결 기능
 //        sendMultiPart() // Multi-part를 이용하여 이미지 전송
+
+        convertJsonTofile()
     }
+
+
+    /**
+     * 내부 캐시 메모리에 저장하는 방법
+     */
+    private fun saveInternalCacheStorage(filename: String, data: String) {
+        try {
+            val file = File(cacheDir, "myCache")
+            val outputStream = FileOutputStream(file)
+            outputStream.write(data.toByteArray())
+            outputStream.close()
+            Log.d("data.toByteArray()", "saved")
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+
+    }
+
+    /**
+     * JSONArray 형태를 파일로 구성
+     */
+    private fun convertJsonTofile() {
+        // STEP0: 임시값 구성 - TODO: 변경 예정
+        val base64Str = CommonUtils.imageToBase64(this)
+        val tempAttention = 99;
+
+        // STEP1: JSON 구성
+        val jsonObject = JSONObject()
+        jsonObject.put("base64", base64Str)
+        jsonObject.put("attention", tempAttention);
+
+        // STEP2: JSON Array 형태로 구성
+        var jsonArrayList = JSONArray();
+        for (i: Int in 1..10)
+            jsonArrayList.put(jsonObject)
+
+        // STEP3: JSON Array -> 파일내에 저장
+        val filePath = getExternalFilesDir(null)!!.path + "/myText.txt"
+        val file = File("/Users/jonghoon/Desktop/workspace/study/bandee_kotlin/app/src/main/java/com/example/bandeekotlin/testfile", "myCache")
+        val outputStream = FileOutputStream(file)
+        outputStream.write(jsonArrayList.toString().toByteArray())
+        outputStream.close()
+        Log.d("data.toByteArray()", "saved")
+    }
+
 
     /**
      * [함수] CameraX 시작
@@ -289,6 +343,7 @@ class MainActivity : AppCompatActivity() {
                     Log.d("API RESPONSE", result)
                     Log.d("종료 시간 ::", "${System.currentTimeMillis()}")
                 }
+
                 override fun onFailure(call: Call<ResponseCode>, t: Throwable) {
                     Log.e("ERROR_CALL", call.toString())
                     Log.e("ERROR", t.toString())
