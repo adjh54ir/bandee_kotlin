@@ -6,13 +6,13 @@ import android.content.pm.PackageManager
 import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
-import android.os.Debug
 import android.os.Environment
 import android.util.Log
-import android.view.Surface
 import android.widget.Button
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -20,29 +20,35 @@ import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.bandeekotlin.camera.LuminosityAnalyzer
-import com.example.bandeekotlin.utils.ApiConnUtils.retrofitConnection
-import com.example.bandeekotlin.utils.CommonUtils
 import com.example.bandeekotlin.model.PostImage
 import com.example.bandeekotlin.model.ResponseCode
+import com.example.bandeekotlin.utils.ApiConnUtils.retrofitConnection
+import com.example.bandeekotlin.utils.CommonUtils
+import com.google.gson.Gson
 import okhttp3.MediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 import java.io.*
-import java.nio.file.Files
-import java.nio.file.Paths
 import java.text.SimpleDateFormat
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import kotlin.collections.ArrayList
 
 
 typealias LumaListener = (luma: Double) -> Unit
+
+class JsonData(
+    var base64: String,
+    var attention: Int,
+)
 
 class MainActivity : AppCompatActivity() {
 
@@ -62,6 +68,7 @@ class MainActivity : AppCompatActivity() {
     /**
      * [init] 최초 수행 함수
      */
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -91,28 +98,50 @@ class MainActivity : AppCompatActivity() {
     /**
      * JSONArray 형태를 파일로 구성
      */
+    @RequiresApi(Build.VERSION_CODES.O)
     private fun convertJsonTofile() {
-        // STEP0: 임시값 구성 - TODO: 변경 예정
+        // STEP0: 임시값 구성
         val base64Str = CommonUtils.imageToBase64(this)
         val tempAttention = 99;
-
-        // STEP1: JSON 구성
         val jsonObject = JSONObject()
-        jsonObject.put("base64", base64Str)
-        jsonObject.put("attention", tempAttention);
+        var jsonArrayList = JSONArray()
 
-        // STEP2: JSON Array 형태로 구성
-        var jsonArrayList = JSONArray();
-        for (i: Int in 1..10)
-            jsonArrayList.put(jsonObject)
+        try {
+            for (i: Int in 1..10) {
+                // STEP1: JSON 구성
+                jsonObject.put("base64", base64Str)
+                jsonObject.put("attention", tempAttention);
+                // STEP2: JSON Array 형태로 구성
+                jsonArrayList.put(jsonObject)
+            }
+        } catch (e: JSONException) {
+            e.printStackTrace()
+        }
 
-        // STEP3: JSON Array -> 파일내에 저장
-        val filePath = getExternalFilesDir(null)!!.path + "/myText.txt"
-        val file = File("/Users/jonghoon/Desktop/workspace/study/bandee_kotlin/app/src/main/java/com/example/bandeekotlin/testfile", "myCache")
-        val outputStream = FileOutputStream(file)
-        outputStream.write(jsonArrayList.toString().toByteArray())
-        outputStream.close()
-        Log.d("data.toByteArray()", "saved")
+        // STEP3: JSON Array -> file 형태로 구성
+        try {
+            // 1. 오늘 날짜를 가져옴.
+            val current = LocalDateTime.now()
+            val formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
+            val formatted = current.format(formatter)
+
+            // 2. 동일한 이름 일 경우 데이터가 이어져서 넘어가는 문제가 발생하여 오늘 날짜를 더함.
+            var filename: String = "file_${formatted}.json"
+
+            // Files 경로에 폴더를 생성한다.
+            val cacheDir = File(cacheDir.absolutePath + "/$filename")
+            val fileDir = File(filesDir.absolutePath + "/$filename")
+            val writer = FileWriter(fileDir, true)
+            // 쓰기 속도 향상
+            val buffer = BufferedWriter(writer)
+            buffer.write(jsonArrayList.toString())
+            buffer.close()
+            Log.d(TAG, "JSON 파일이 생성되었습니다.")
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Log.d(TAG, "파일 생성을 종료합니다.")
+        }
     }
 
 

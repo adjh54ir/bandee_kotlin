@@ -4,7 +4,6 @@ import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.util.Base64
-import android.util.Log
 import androidx.camera.core.ImageProxy
 import androidx.core.content.ContextCompat
 import com.example.bandeekotlin.*
@@ -68,10 +67,7 @@ object CommonUtils {
         imageToBitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
         val byteArray = byteArrayOutputStream.toByteArray()
 
-        val base64Str = Base64.encodeToString(byteArray, Base64.DEFAULT)
-        Log.d("base64 ::::::::: ", base64Str)
-
-        return base64Str
+        return Base64.encodeToString(byteArray, Base64.DEFAULT)
     }
 
 
