@@ -7,8 +7,16 @@ import android.util.Base64
 import androidx.camera.core.ImageProxy
 import androidx.core.content.ContextCompat
 import com.example.bandeekotlin.*
-import java.io.ByteArrayOutputStream
 import android.content.Context
+import android.os.Build
+import android.util.Log
+import androidx.annotation.RequiresApi
+import org.json.JSONArray
+import org.json.JSONException
+import org.json.JSONObject
+import java.io.*
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 object CommonUtils {
 
@@ -69,6 +77,39 @@ object CommonUtils {
 
         return Base64.encodeToString(byteArray, Base64.DEFAULT)
     }
+
+    /**
+     * JSONArray -> file 데이터 변환 및 저장
+     */
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun convertJsonTofile(
+        context: Context,
+        paramJsonArray: JSONArray,
+        fileName: String,
+        saveLoc: String
+    ) {
+        var dir = ""
+        // STEP1: 저장 경로
+        if (saveLoc == "files") dir = File(context.filesDir.absolutePath + "/$fileName").toString()
+        if (saveLoc == "cache") dir = File(context.cacheDir.absolutePath + "/$fileName").toString()
+
+        // STEP3: JSON Array -> file 형태로 구성
+        try {
+            // 2. 동일한 이름 일 경우 데이터가 이어져서 넘어가는 문제가 발생하여 오늘 날짜를 더함.
+            var filename: String = "$fileName.json"
+            val writer = FileWriter(dir, true)
+            // 쓰기 속도 향상
+            val buffer = BufferedWriter(writer)
+            buffer.write(paramJsonArray.toString())
+            buffer.close()
+            Log.d("success", "JSON 파일이 생성되었습니다.")
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Log.e("error", "파일 생성을 종료합니다.")
+        }
+    }
+
 
 
 }

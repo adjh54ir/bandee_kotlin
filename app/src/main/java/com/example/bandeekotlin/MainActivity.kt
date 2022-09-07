@@ -45,11 +45,6 @@ import java.util.concurrent.Executors
 
 typealias LumaListener = (luma: Double) -> Unit
 
-class JsonData(
-    var base64: String,
-    var attention: Int,
-)
-
 class MainActivity : AppCompatActivity() {
 
     /**
@@ -126,7 +121,8 @@ class MainActivity : AppCompatActivity() {
             val formatted = current.format(formatter)
 
             // 2. 동일한 이름 일 경우 데이터가 이어져서 넘어가는 문제가 발생하여 오늘 날짜를 더함.
-            var filename: String = "file_${formatted}.json"
+//            var filename: String = "file_${formatted}.json"
+            var filename: String = "file.json"
 
             // Files 경로에 폴더를 생성한다.
             val cacheDir = File(cacheDir.absolutePath + "/$filename")
@@ -141,6 +137,21 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             e.printStackTrace()
             Log.d(TAG, "파일 생성을 종료합니다.")
+        }
+
+        this.fileReader(filesDir.absolutePath + "/file.json")
+
+    }
+
+    /**
+     * JSON 파일 읽기
+     */
+    @RequiresApi(Build.VERSION_CODES.N)
+    private fun fileReader(filePath: String) {
+        val fileDir = File(filePath)
+        val reader = BufferedReader(FileReader(fileDir))
+        reader.lines().forEach {
+            Log.d("test", it)
         }
     }
 
