@@ -8,7 +8,6 @@ import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
 import android.util.Log
 import android.widget.Button
 import android.widget.Toast
@@ -24,7 +23,6 @@ import com.example.bandeekotlin.model.PostImage
 import com.example.bandeekotlin.model.ResponseCode
 import com.example.bandeekotlin.utils.ApiConnUtils.retrofitConnection
 import com.example.bandeekotlin.utils.CommonUtils
-import com.google.gson.Gson
 import okhttp3.MediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -47,6 +45,9 @@ typealias LumaListener = (luma: Double) -> Unit
 
 class MainActivity : AppCompatActivity() {
 
+    init{
+        instance = this
+    }
     /**
      * 공통 변수에 대해서 선언
      */
@@ -58,6 +59,10 @@ class MainActivity : AppCompatActivity() {
         private lateinit var outputDirectory: File
         private lateinit var cameraExcutor: ExecutorService
         private const val TAG = "CameraXBasic"
+        var instance: MainActivity? = null
+        fun context() : Context {
+            return instance!!.applicationContext
+        }
     }
 
     /**
@@ -67,10 +72,10 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-//        connectionCamera(); // 카메라 연결 기능
+        connectionCamera(); // 카메라 연결 기능
 //        sendMultiPart() // Multi-part를 이용하여 이미지 전송
 
-        convertJsonTofile()
+//        convertJsonTofile()
     }
 
 
@@ -96,7 +101,7 @@ class MainActivity : AppCompatActivity() {
     @RequiresApi(Build.VERSION_CODES.O)
     private fun convertJsonTofile() {
         // STEP0: 임시값 구성
-        val base64Str = CommonUtils.imageToBase64(this)
+        val base64Str = CommonUtils.imageToBase64()
         val tempAttention = 99;
         val jsonObject = JSONObject()
         var jsonArrayList = JSONArray()
@@ -121,13 +126,13 @@ class MainActivity : AppCompatActivity() {
             val formatted = current.format(formatter)
 
             // 2. 동일한 이름 일 경우 데이터가 이어져서 넘어가는 문제가 발생하여 오늘 날짜를 더함.
-//            var filename: String = "file_${formatted}.json"
-            var filename: String = "file.json"
+            var filename: String = "file_${formatted}.json"
+//            var filename: String = "file.json"
 
             // Files 경로에 폴더를 생성한다.
             val cacheDir = File(cacheDir.absolutePath + "/$filename")
             val fileDir = File(filesDir.absolutePath + "/$filename")
-            val writer = FileWriter(fileDir, true)
+            val writer = FileWriter(fileDir, false)
             // 쓰기 속도 향상
             val buffer = BufferedWriter(writer)
             buffer.write(jsonArrayList.toString())
@@ -227,7 +232,7 @@ class MainActivity : AppCompatActivity() {
             val imageLuminosityAnalyzer = ImageAnalysis.Builder()
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExcutor, LuminosityAnalyzer { luma ->
+                    it.setAnalyzer(cameraExcutor, LuminosityAnalyzer { luma  ->
                         Log.d(TAG, "평균 광도 : $luma")
                     });
                 }
@@ -369,7 +374,7 @@ class MainActivity : AppCompatActivity() {
     private fun postBase64() {
 
 
-        val base64Str = CommonUtils.imageToBase64(this)
+        val base64Str = CommonUtils.imageToBase64()
         val tempImageName = "image1"
         // Image To base64
         val formData = PostImage(base64Str, tempImageName)

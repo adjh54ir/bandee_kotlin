@@ -7,16 +7,11 @@ import android.util.Base64
 import androidx.camera.core.ImageProxy
 import androidx.core.content.ContextCompat
 import com.example.bandeekotlin.*
-import android.content.Context
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
 import org.json.JSONArray
-import org.json.JSONException
-import org.json.JSONObject
 import java.io.*
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 
 object CommonUtils {
 
@@ -61,10 +56,10 @@ object CommonUtils {
      * STEP3: Bitmap -> ByteArr로 변경
      * STEP4: ByteArr -> String으로 변경
      */
-    fun imageToBase64(context: Context): String {
+    fun imageToBase64(): String {
 
         // 1. 실제 이미지 파일
-        val image1: Drawable? = ContextCompat.getDrawable(context, R.drawable.image_3)
+        val image1: Drawable? = ContextCompat.getDrawable(MainActivity.context(), R.drawable.image_3)
 
         // 2. 실제 이미지 파일 -> Bitmap
         val bitmapDrawable = image1 as BitmapDrawable
@@ -83,15 +78,14 @@ object CommonUtils {
      */
     @RequiresApi(Build.VERSION_CODES.O)
     private fun convertJsonTofile(
-        context: Context,
         paramJsonArray: JSONArray,
         fileName: String,
         saveLoc: String
     ) {
         var dir = ""
         // STEP1: 저장 경로
-        if (saveLoc == "files") dir = File(context.filesDir.absolutePath + "/$fileName").toString()
-        if (saveLoc == "cache") dir = File(context.cacheDir.absolutePath + "/$fileName").toString()
+        if (saveLoc == "files") dir = File(MainActivity.context().filesDir.absolutePath + "/$fileName").toString()
+        if (saveLoc == "cache") dir = File(MainActivity.context().cacheDir.absolutePath + "/$fileName").toString()
 
         // STEP3: JSON Array -> file 형태로 구성
         try {
